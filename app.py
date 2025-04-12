@@ -1,95 +1,52 @@
 import streamlit as st
-import numpy as np
-from PIL import Image
 from streamlit_drawable_canvas import st_canvas
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten, Dense
-from sklearn.model_selection import train_test_split
-from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import load_model
+import numpy as np
+from PIL import Image, ImageOps
 
-# Set page config
-st.set_page_config(page_title="Cat Detector", layout="centered")
+# Load model
+model = load_model("model.h5")
 
-# Title
-st.title("🐱 Is it a Cat?")
-st.write("Draw something below or upload an image and click **Submit** to check if it looks like a **cat**!")
+st.title("🐱 Is It a Cat? - Doodle Classifier")
+st.write("Draw a doodle or upload a 28x28 image to see if it's a cat.")
 
-# Load QuickDraw "cat" dataset
-category = "cat"
-data = np.load(f"quickdraw_data/{category}.npy")[:1000] / 255.0
-labels = np.ones((data.shape[0],))  # Label 1 for cat
+# ---- DRAWING CANVAS ----
+st.subheader("✍️ Draw Here (Black on White)")
 
-# Add noise for "not cat" samples
-not_cat = np.random.rand(1000, 784)  # Random noise for non-cat images
-X = np.concatenate([data, not_cat])
-y = np.concatenate([labels, np.zeros((1000,))])  # Label 0 for not cat
+canvas_result = st_canvas(
+    fill_color="rgba(0, 0, 0, 1)",  # Black ink
+    stroke_width=10,
+    stroke_color="#000000",
+    background_color="#ffffff",
+    width=280,
+    height=280,
+    drawing_mode="freedraw",
+    key="canvas"
+)
 
-# Reshape data to fit CNN input format (28x28x1)
-X = X.reshape(-1, 28, 28, 1)
+# ---- IMAGE UPLOAD ----
+st.subheader("📤 Or Upload an Image")
 
-# One-hot encode the labels for categorical crossentropy loss
-y = to_categorical(y, 2)
+uploaded_file = st.file_uploader("Choose a 28x28 image file (optional)", type=["png", "jpg", "jpeg"])
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# ---- Predict Function ----
+def predict(image):
+    img = image.convert("L").resize((28, 28))  # grayscale and resize
+    img_array = np.array(img) / 255.0
+    img_array = img_array.reshape(1, 28, 28, 1)
+    prediction = model.predict(img_array)[0]
+    cat_prob = prediction[1] * 100
+    not_cat_prob = prediction[0] * 100
+    return f"🐱 Cat: {cat_prob:.2f}%\n❌ Not Cat: {not_cat_prob:.2f}%"
 
-# ✅ Build CNN Model
-model = Sequential([
-    Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
-    MaxPooling2D((2, 2)),
-    Dropout(0.25),  # Dropout to avoid overfitting
-    Conv2D(64, (3, 3), activation='relu'),
-    MaxPooling2D((2, 2)),
-    Dropout(0.25),
-    Flatten(),
-    Dense(128, activation='relu'),
-    Dropout(0.5),
-    Dense(2, activation='softmax')  # Two classes: Cat or Not Cat
-])
+# ---- Handle Input ----
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", width=140)
+    st.write(predict(image))
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-model.fit(X_train, y_train, epochs=15, validation_split=0.2)
-
-# ✅ Evaluate model
-loss, acc = model.evaluate(X_test, y_test)
-st.write(f"Test Accuracy: {acc:.2f}")
-
-# Choice: draw or upload
-option = st.radio("Choose input method:", ("🎨 Draw on canvas", "📁 Upload an image"))
-
-image_input = None
-
-if option == "🎨 Draw on canvas":
-    canvas_result = st_canvas(
-        fill_color="white",
-        stroke_width=3,  # smaller brush
-        stroke_color="black",
-        background_color="white",
-        height=512,
-        width=512,
-        drawing_mode="freedraw",
-        key="canvas",
-    )
-
-    if canvas_result.image_data is not None:
-        img = Image.fromarray(canvas_result.image_data.astype("uint8"))
-        image_input = img
-
-elif option == "📁 Upload an image":
-    uploaded_file = st.file_uploader("Upload a drawing or sketch", type=["png", "jpg", "jpeg"])
-    if uploaded_file:
-        image_input = Image.open(uploaded_file)
-
-# Prediction
-if image_input is not None:
-    gray_img = image_input.convert("L").resize((28, 28))  # Convert to grayscale and resize
-    img_array = np.array(gray_img).reshape(1, 28, 28, 1) / 255.0  # Reshape for CNN input
-
-    st.image(image_input.resize((150, 150)), caption="Input Image")
-
-    if st.button("Submit"):
-        pred = model.predict(img_array)  # Predict using CNN
-        cat_prob = pred[0][1] * 100
-        not_cat_prob = pred[0][0] * 100
-        st.markdown(f"### 🐱 Cat: `{cat_prob:.2f}%`")
-        st.markdown(f"### ❌ Not Cat: `{not_cat_prob:.2f}%`")
+elif canvas_result.image_data is not None:
+    # Use the canvas image only if it’s not blank
+    image = Image.fromarray((255 - canvas_result.image_data[:, :, 0]).astype('uint8'))  # invert so black = doodle
+    st.image(image, caption="Drawn Image", width=140)
+    st.write(predict(image))
