@@ -5,6 +5,17 @@ import numpy as np
 from PIL import Image, ImageOps
 import os
 
+# ---- Predict Function ----
+def predict(image):
+    img = image.convert("L").resize((28, 28))  # Convert to grayscale and resize
+    img_array = np.array(img) / 255.0
+    img_array = img_array.reshape(1, 28, 28, 1)
+    prediction = model.predict(img_array)[0]
+    cat_prob = prediction[1] * 100
+    not_cat_prob = prediction[0] * 100
+    return f"🐱 **Cat**: `{cat_prob:.2f}%`\n❌ **Not Cat**: `{not_cat_prob:.2f}%`"
+
+# Set page config
 st.set_page_config(page_title="🐱 Doodle Cat Classifier", layout="centered")
 
 st.title("🐱 Is It a Cat? - Doodle Classifier")
@@ -63,13 +74,3 @@ elif input_option == "Upload Image":
         image = Image.open(uploaded_file)
         st.image(image, caption="📸 Uploaded Image", width=140)
         st.markdown(predict(image))
-
-# ---- Predict Function ----
-def predict(image):
-    img = image.convert("L").resize((28, 28))  # Convert to grayscale and resize
-    img_array = np.array(img) / 255.0
-    img_array = img_array.reshape(1, 28, 28, 1)
-    prediction = model.predict(img_array)[0]
-    cat_prob = prediction[1] * 100
-    not_cat_prob = prediction[0] * 100
-    return f"🐱 **Cat**: `{cat_prob:.2f}%`\n❌ **Not Cat**: `{not_cat_prob:.2f}%`"
