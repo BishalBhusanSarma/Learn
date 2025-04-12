@@ -22,23 +22,47 @@ except Exception as e:
     st.error(f"⚠️ Failed to load model: {e}")
     st.stop()
 
-# ---- DRAWING CANVAS ----
-st.subheader("✍️ Draw Here (Black on White)")
+# ---- Option to Choose Draw or Upload ----
+input_option = st.radio("Choose your input method:", ("Draw", "Upload Image"))
 
-canvas_result = st_canvas(
-    fill_color="rgba(0, 0, 0, 1)",  # Black ink
-    stroke_width=10,
-    stroke_color="#000000",
-    background_color="#ffffff",
-    width=280,
-    height=280,
-    drawing_mode="freedraw",
-    key="canvas"
-)
+# ---- DRAWING CANVAS ----
+if input_option == "Draw":
+    st.subheader("✍️ Draw Here (Black on White)")
+
+    # Set canvas size to 512x512 and brush size to 3
+    canvas_result = st_canvas(
+        fill_color="rgba(0, 0, 0, 1)",  # Black ink
+        stroke_width=3,  # Set brush size to 3
+        stroke_color="#000000",
+        background_color="#ffffff",
+        width=512,  # Canvas size 512x512
+        height=512,
+        drawing_mode="freedraw",
+        key="canvas"
+    )
+
+    # Buttons for Clear and Submit actions
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Clear"):
+            st.session_state.canvas_data = None  # Clears the drawing
+
+    with col2:
+        if st.button("Submit"):
+            if canvas_result.image_data is not None and np.max(canvas_result.image_data) > 0:
+                image = Image.fromarray((255 - canvas_result.image_data[:, :, 0]).astype('uint8'))  # Invert to make doodle black
+                st.image(image, caption="🖌️ Drawn Image", width=140)
+                st.markdown(predict(image))
 
 # ---- IMAGE UPLOAD ----
-st.subheader("📤 Or Upload an Image")
-uploaded_file = st.file_uploader("Choose a 28x28 image file (optional)", type=["png", "jpg", "jpeg"])
+elif input_option == "Upload Image":
+    st.subheader("📤 Or Upload an Image")
+    uploaded_file = st.file_uploader("Choose a 28x28 image file (optional)", type=["png", "jpg", "jpeg"])
+
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        st.image(image, caption="📸 Uploaded Image", width=140)
+        st.markdown(predict(image))
 
 # ---- Predict Function ----
 def predict(image):
@@ -49,15 +73,3 @@ def predict(image):
     cat_prob = prediction[1] * 100
     not_cat_prob = prediction[0] * 100
     return f"🐱 **Cat**: `{cat_prob:.2f}%`\n❌ **Not Cat**: `{not_cat_prob:.2f}%`"
-
-# ---- Handle Input and Show Prediction ----
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="📸 Uploaded Image", width=140)
-    st.markdown(predict(image))
-
-elif canvas_result.image_data is not None and np.max(canvas_result.image_data) > 0:
-    # Use the canvas image only if it’s not blank
-    image = Image.fromarray((255 - canvas_result.image_data[:, :, 0]).astype('uint8'))  # Invert to make doodle black
-    st.image(image, caption="🖌️ Drawn Image", width=140)
-    st.markdown(predict(image))
