@@ -3,4 +3,3 @@ streamlit-drawable-canvas
 tensorflow
 numpy
 Pillow
-os
