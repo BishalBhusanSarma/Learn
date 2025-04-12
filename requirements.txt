@@ -1,12 +1,5 @@
 streamlit
 streamlit-drawable-canvas
-<<<<<<< HEAD
 tensorflow
 numpy
 Pillow
-=======
-numpy
-pillow
-scikit-learn
-tensorflow
->>>>>>> 4c489e77434d39ffc065707d8f76b1733c7601a0
